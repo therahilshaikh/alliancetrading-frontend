@@ -7,7 +7,7 @@ export type Audience = 'all' | 'selected'
 export type EntryType = 'profit' | 'loss'
 
 const member = z.object({
-  investmentId: z.string().uuid(),
+  userId: z.string().uuid(),
   /** Display only. */
   name: z.string(),
   mobile: z.string().optional(),
@@ -26,8 +26,9 @@ export function sumAmounts(members: { value?: number }[]): number {
 
 /**
  * Values are entered as positive numbers; Profit/Loss decides the sign.
- * FIXED: every target investment gets exactly the amount.
- * PERCENTAGE: every target investment gets its own principal × percentage.
+ * FIXED: every target member gets exactly the amount (split across their tranches server-side).
+ * PERCENTAGE: every target member gets their own principal × percentage.
+ * One line per member; the server rejects a member appearing twice (400 VALIDATION_FAILED).
  * The server computes the total (controlTotal is not sent).
  */
 export function makePnlSchema(today: string) {
@@ -63,7 +64,13 @@ export function makePnlSchema(today: string) {
       }
       if (!v.members.length)
         ctx.addIssue({ code: 'custom', path: ['members'], message: 'Select at least one member' })
-      v.members.forEach((m, i) => check(m.value, ['members', i, 'value']))
+      const seen = new Set<string>()
+      v.members.forEach((m, i) => {
+        if (seen.has(m.userId))
+          ctx.addIssue({ code: 'custom', path: ['members', i, 'value'], message: 'Listed twice' })
+        seen.add(m.userId)
+        check(m.value, ['members', i, 'value'])
+      })
     })
 }
 
@@ -78,12 +85,12 @@ type LineRequest = PnlBatchRequest['lines'][number]
 
 /** Lines for the form's current values; members without a value are skipped (preview only). */
 function toLines(v: PnlFormValues): LineRequest[] {
-  const raw: { targetType: 'ALL' | 'INVESTMENT'; investmentId?: string; value?: number }[] =
+  const raw: { targetType: 'ALL' | 'MEMBER'; userId?: string; value?: number }[] =
     v.audience === 'all'
       ? [{ targetType: 'ALL', value: v.value }]
       : v.members.map((m) => ({
-          targetType: 'INVESTMENT',
-          investmentId: m.investmentId,
+          targetType: 'MEMBER',
+          userId: m.userId,
           value: m.value,
         }))
   const out: LineRequest[] = []

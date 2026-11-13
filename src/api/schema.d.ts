@@ -1618,7 +1618,7 @@ export interface components {
         PnlLineRequest: {
             targetType: string;
             /** Format: uuid */
-            investmentId?: string;
+            userId?: string;
             amount?: number;
             percentage?: number;
         };
@@ -1651,8 +1651,6 @@ export interface components {
         };
         AllocationPreview: {
             /** Format: uuid */
-            investmentId?: string;
-            /** Format: uuid */
             userId?: string;
             fullName?: string;
             mobile?: string;
@@ -1662,6 +1660,7 @@ export interface components {
             resultingPrincipal?: number;
             resultingProfit?: number;
             largeChange?: boolean;
+            tranches?: components["schemas"]["TranchePreview"][];
         };
         PreviewResult: {
             /** Format: uuid */
@@ -1674,6 +1673,12 @@ export interface components {
             largeChangeThresholdPct?: number;
             allocations?: components["schemas"]["AllocationPreview"][];
             warnings?: string[];
+        };
+        TranchePreview: {
+            /** Format: uuid */
+            investmentId?: string;
+            earningPrincipal?: number;
+            amount?: number;
         };
         RejectInvestmentRequest: {
             reason: string;
@@ -1932,11 +1937,15 @@ export interface components {
         };
         AllocationResponse: {
             /** Format: uuid */
-            investmentId?: string;
-            /** Format: uuid */
             userId?: string;
             fullName?: string;
             mobile?: string;
+            amount?: number;
+            tranches?: components["schemas"]["TrancheAllocationResponse"][];
+        };
+        TrancheAllocationResponse: {
+            /** Format: uuid */
+            investmentId?: string;
             amount?: number;
         };
         ApproverOption: {

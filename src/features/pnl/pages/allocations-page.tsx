@@ -8,6 +8,7 @@ import { Money, PlainDate } from '@/components/shared/format'
 import { DetailList, PageHeader, Panel } from '@/components/shared/layout'
 import { StatusBadge } from '@/components/shared/status-badge'
 import { useAllocations, useBatch, type Allocation } from '../api'
+import { TrancheBreakdown } from '../components/tranches'
 import { MemberName } from '@/features/members/member-name'
 import { useAdminName } from '@/features/admins/api'
 
@@ -39,6 +40,12 @@ export function PnlAllocationsPage() {
         header: 'Amount',
         accessorFn: (a) => a.amount ?? 0,
         cell: ({ row }) => <Money value={row.original.amount} signed className="font-bold" />,
+      },
+      {
+        id: 'tranches',
+        header: 'Investments',
+        enableSorting: false,
+        cell: ({ row }) => <TrancheBreakdown tranches={row.original.tranches} />,
       },
     ],
     [],
@@ -77,7 +84,7 @@ export function PnlAllocationsPage() {
         label="Allocations"
         columns={columns}
         data={q.data}
-        getRowId={(a) => a.investmentId ?? ''}
+        getRowId={(a) => a.userId ?? ''}
         isLoading={q.isLoading}
         isFetching={q.isFetching}
         error={q.error}

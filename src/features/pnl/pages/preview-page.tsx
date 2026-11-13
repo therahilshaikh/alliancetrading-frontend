@@ -13,6 +13,7 @@ import { useAuth } from '@/app/auth'
 import { MemberName } from '@/features/members/member-name'
 import { useApproveBatch, useBatch, usePreview, useRejectBatch, type Preview } from '../api'
 import { LargeChangeBadge, LargeChangeSummary } from '../components/large-change'
+import { TrancheBreakdown } from '../components/tranches'
 import { useAdminName } from '@/features/admins/api'
 
 const route = getRouteApi('/app/pnl/$batchId/preview')
@@ -84,6 +85,12 @@ export function PnlPreviewPage() {
         id: 'resultingProfit',
         header: 'Profit after',
         cell: ({ row }) => <Money value={row.original.resultingProfit} signed />,
+      },
+      {
+        id: 'tranches',
+        header: 'Investments',
+        enableSorting: false,
+        cell: ({ row }) => <TrancheBreakdown tranches={row.original.tranches} />,
       },
     ],
     [threshold],
@@ -230,10 +237,10 @@ export function PnlPreviewPage() {
             label="Allocations preview"
             columns={columns}
             data={p.allocations}
-            getRowId={(r) => r.investmentId ?? ''}
+            getRowId={(r) => r.userId ?? ''}
             isFetching={preview.isFetching}
             onRefresh={() => void preview.refetch()}
-            emptyTitle="No investments affected"
+            emptyTitle="No members affected"
             paging={{ mode: 'client', pageSize: 50 }}
           />
         </div>

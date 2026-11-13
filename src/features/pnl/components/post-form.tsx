@@ -130,8 +130,8 @@ export function PostPnlForm() {
           title="All active members"
           description={
             activeCount !== undefined
-              ? `Every active investment (${activeCount})`
-              : 'Every active investment'
+              ? `Every member with an active investment (${activeCount})`
+              : 'Every member with an active investment'
           }
         />
         <ChoiceCard
@@ -332,7 +332,7 @@ function PreviewPanel({
   const isFixed = v.valueType === 'FIXED'
   const data = hasInput && !preview.error ? preview.data : undefined
   const allocations = data?.allocations ?? []
-  const selectedById = new Map(v.members.map((m) => [m.investmentId, m]))
+  const selectedById = new Map(v.members.map((m) => [m.userId, m]))
   const amounts = allocations.map((a) => Math.abs(a.amount ?? 0))
   const min = amounts.length ? Math.min(...amounts) : undefined
   const max = amounts.length ? Math.max(...amounts) : undefined
@@ -462,11 +462,11 @@ function PreviewPanel({
               {[...allocations]
                 .sort((a, b) => Math.abs(b.amount ?? 0) - Math.abs(a.amount ?? 0))
                 .map((a) => {
-                  const picked = selectedById.get(a.investmentId ?? '')
+                  const picked = selectedById.get(a.userId ?? '')
                   const pct = isFixed ? undefined : v.audience === 'all' ? v.value : picked?.value
                   return (
                     <li
-                      key={a.investmentId}
+                      key={a.userId}
                       className="flex items-center justify-between gap-3 rounded-xl bg-slate-50 px-3 py-2.5 text-xs dark:bg-white/5"
                     >
                       <span className="min-w-0 text-slate-700 dark:text-slate-200">
@@ -694,29 +694,28 @@ function SelectedMembers({
   const list = useMembers({ search: q || undefined, status: 'APPROVED', page: 0, size: 50 })
   const isFixed = valueType === 'FIXED'
 
-  // liveInvestmentId resolves to the member's single live investment server-side. With
-  // multi-tranche (VITE_MULTI_INVESTMENT_ENABLED) a member can hold several ACTIVE
-  // investments; per-tranche P&L selection needs the members list to expose tranches.
+  // Lines target members; the server spreads each member's amount across their ACTIVE
+  // tranches. Offer members with active principal (the live investment may be a newer,
+  // still-pending tranche when VITE_MULTI_INVESTMENT_ENABLED is on).
   const visible = (list.data?.items ?? [])
-    .filter((m) => m.liveInvestmentId && m.liveInvestmentStatus === 'ACTIVE')
+    .filter((m) => m.userId && (m.liveInvestmentStatus === 'ACTIVE' || (m.principal ?? 0) > 0))
     .map((m) => ({
-      investmentId: m.liveInvestmentId!,
+      userId: m.userId!,
       name: m.fullName ?? 'Unnamed member',
       mobile: m.mobile,
     }))
-  const selectedIds = new Set(members.map((m) => m.investmentId))
-  const allVisibleSelected =
-    visible.length > 0 && visible.every((m) => selectedIds.has(m.investmentId))
+  const selectedIds = new Set(members.map((m) => m.userId))
+  const allVisibleSelected = visible.length > 0 && visible.every((m) => selectedIds.has(m.userId))
 
-  function toggle(m: { investmentId: string; name: string; mobile?: string }) {
+  function toggle(m: { userId: string; name: string; mobile?: string }) {
     onChange(
-      selectedIds.has(m.investmentId)
-        ? members.filter((x) => x.investmentId !== m.investmentId)
+      selectedIds.has(m.userId)
+        ? members.filter((x) => x.userId !== m.userId)
         : [...members, { ...m, value: shared }],
     )
   }
   function update(id: string, value: number | undefined) {
-    onChange(members.map((m) => (m.investmentId === id ? { ...m, value } : m)))
+    onChange(members.map((m) => (m.userId === id ? { ...m, value } : m)))
   }
 
   return (
@@ -736,7 +735,7 @@ function SelectedMembers({
           <ul aria-label="Selected members" className="mt-4 flex flex-wrap gap-2">
             {members.map((m) => (
               <li
-                key={m.investmentId}
+                key={m.userId}
                 className="bg-brand-soft text-brand dark:bg-brand/15 flex items-center gap-1.5 rounded-full py-1 pr-1 pl-3 text-xs font-bold dark:text-indigo-200"
               >
                 {m.name}
@@ -800,14 +799,14 @@ function SelectedMembers({
           type="button"
           disabled={!visible.length}
           onClick={() => {
-            const ids = new Set(visible.map((m) => m.investmentId))
+            const ids = new Set(visible.map((m) => m.userId))
             onChange(
               allVisibleSelected
-                ? members.filter((m) => !ids.has(m.investmentId))
+                ? members.filter((m) => !ids.has(m.userId))
                 : [
                     ...members,
                     ...visible
-                      .filter((m) => !selectedIds.has(m.investmentId))
+                      .filter((m) => !selectedIds.has(m.userId))
                       .map((m) => ({ ...m, value: shared })),
                   ],
             )
@@ -831,12 +830,12 @@ function SelectedMembers({
           </p>
         ) : (
           visible.map((m) => {
-            const sel = members.find((x) => x.investmentId === m.investmentId)
-            const idx = members.findIndex((x) => x.investmentId === m.investmentId)
+            const sel = members.find((x) => x.userId === m.userId)
+            const idx = members.findIndex((x) => x.userId === m.userId)
             const err = idx >= 0 ? errors?.[idx]?.value?.message : undefined
             return (
               <div
-                key={m.investmentId}
+                key={m.userId}
                 className={cn(
                   'flex items-center gap-3 border-b border-slate-100 p-4 last:border-0 dark:border-white/5',
                   sel && 'bg-brand/[0.03] dark:bg-brand/5',
@@ -862,7 +861,7 @@ function SelectedMembers({
                   <SmallValueInput
                     valueType={valueType}
                     value={sel.value}
-                    onChange={(n) => update(m.investmentId, n)}
+                    onChange={(n) => update(m.userId, n)}
                     label={`${isFixed ? 'Amount' : 'Percentage'} for ${m.name}`}
                   />
                 ) : (

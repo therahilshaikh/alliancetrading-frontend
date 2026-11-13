@@ -3,8 +3,8 @@ import { makePnlSchema, sumAmounts, toBatchRequest, toPreviewRequest } from './s
 
 const TODAY = '2026-10-22'
 const APPROVER = '1e639c71-3204-49bc-a177-024620ab1df5'
-const INV_A = '24f0bb37-3735-419d-8942-135be95973ab'
-const INV_B = '9b2b6a1e-5c4f-4b8e-9f0a-1c2d3e4f5a6b'
+const USER_A = '24f0bb37-3735-419d-8942-135be95973ab'
+const USER_B = '9b2b6a1e-5c4f-4b8e-9f0a-1c2d3e4f5a6b'
 const schema = makePnlSchema(TODAY)
 
 const base = {
@@ -13,7 +13,7 @@ const base = {
   valueType: 'FIXED' as 'FIXED' | 'PERCENTAGE',
   sessionDate: TODAY,
   approverAdminId: APPROVER as string,
-  members: [] as { investmentId: string; name: string; value?: number }[],
+  members: [] as { userId: string; name: string; value?: number }[],
 }
 const issues = (v: unknown) => {
   const r = schema.safeParse(v)
@@ -62,8 +62,8 @@ describe('P&L form — all active members', () => {
 
 describe('P&L form — selected members', () => {
   const members = [
-    { investmentId: INV_A, name: 'A', value: 0.1 },
-    { investmentId: INV_B, name: 'B', value: 0.2 },
+    { userId: USER_A, name: 'A', value: 0.1 },
+    { userId: USER_B, name: 'B', value: 0.2 },
   ]
   const sel = { ...base, audience: 'selected' as const, members }
 
@@ -73,8 +73,8 @@ describe('P&L form — selected members', () => {
 
   it('one INVESTMENT line per member', () => {
     expect(toBatchRequest(schema.parse(sel)).lines).toEqual([
-      { targetType: 'INVESTMENT', investmentId: INV_A, amount: 0.1 },
-      { targetType: 'INVESTMENT', investmentId: INV_B, amount: 0.2 },
+      { targetType: 'MEMBER', userId: USER_A, amount: 0.1 },
+      { targetType: 'MEMBER', userId: USER_B, amount: 0.2 },
     ])
     expect(
       toBatchRequest(schema.parse({ ...sel, valueType: 'PERCENTAGE', entry: 'loss' })).lines.map(
@@ -83,9 +83,15 @@ describe('P&L form — selected members', () => {
     ).toEqual([-0.1, -0.2])
   })
 
+  it('flags the same member listed twice', () => {
+    expect(issues({ ...sel, members: [members[0], members[0]] })).toEqual([
+      'members.1.value: Listed twice',
+    ])
+  })
+
   it('requires at least one member and a value for each', () => {
     expect(issues({ ...sel, members: [] })[0]).toMatch(/^members: Select at least one member/)
-    expect(issues({ ...sel, members: [{ investmentId: INV_A, name: 'A' }] })[0]).toMatch(
+    expect(issues({ ...sel, members: [{ userId: USER_A, name: 'A' }] })[0]).toMatch(
       /^members.0.value/,
     )
   })
@@ -98,7 +104,7 @@ describe('dry-run preview body', () => {
       toPreviewRequest({
         ...base,
         audience: 'selected',
-        members: [{ investmentId: INV_A, name: 'A' }],
+        members: [{ userId: USER_A, name: 'A' }],
       }),
     ).toBeNull()
     expect(toPreviewRequest({ ...base, valueType: 'PERCENTAGE', value: 150 })).toBeNull()
@@ -110,15 +116,15 @@ describe('dry-run preview body', () => {
       approverAdminId: '',
       audience: 'selected',
       members: [
-        { investmentId: INV_A, name: 'A', value: 50 },
-        { investmentId: INV_B, name: 'B' },
+        { userId: USER_A, name: 'A', value: 50 },
+        { userId: USER_B, name: 'B' },
       ],
     })
     expect(body).toEqual({
       sessionDate: TODAY,
       valueType: 'FIXED',
       approverAdminId: undefined,
-      lines: [{ targetType: 'INVESTMENT', investmentId: INV_A, amount: 50 }],
+      lines: [{ targetType: 'MEMBER', userId: USER_A, amount: 50 }],
     })
   })
 })
